@@ -32,7 +32,7 @@ def argmin(xi, mu_list):
     for j in range(len(mu_list)):
         sum = 0
         for cord in range(len(xi)):
-            sum += (xi[cord] - mu_list[j][cord]) ** 2
+            sum += ((xi[cord] - mu_list[j][cord]) ** 2)
         lst_dec[j] = (math.sqrt(sum))
     val, idx = min((val, idx) for (idx, val) in enumerate(lst_dec))
     return idx
@@ -61,13 +61,22 @@ def k_means(K, filename, max_iter=200):
 
     while delta_max >= epsilon and run_index < max_iter:
         run_index += 1
+        cnt = 0
+
+        changes = []
+        print(sum([len(x) for x in d.values()]))
         for mu_index in range(len(mu_list)):
             for xi in d[mu_index]:
                 new_mu_index = argmin(xi, mu_list)
+                cnt += 1
                 if new_mu_index != mu_index:
-                    d[mu_index].remove(xi)
-                    d[new_mu_index].append(xi)
-
+                    # d[mu_index].remove(xi)
+                    # d[new_mu_index].append(xi)
+                    changes.append((mu_index,new_mu_index,xi))
+        for (s,t,xi) in changes:
+            d[s].remove(xi)
+            d[t].append(xi)
+        print(cnt)
         cord_delta_list = []
         for mu_index in range(len(mu_list)):
             new_mu = update_mu(d[mu_index])
@@ -91,7 +100,7 @@ def k_means(K, filename, max_iter=200):
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    file_name = "input_1.txt"
-    k_means(3, file_name,600)
+    file_name = "input_3.txt"
+    k_means(15, file_name,300)
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
