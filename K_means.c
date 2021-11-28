@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-// hello
 
 // define vertex struct
 typedef struct vertex
@@ -119,6 +118,7 @@ double[12] compute_norm(double[12][K] mus_array, double[12][K] new_mus_array ){
 
 void K_mean(int K, char* filename, int max_iter = 200){
 
+
 }
 
 
@@ -156,7 +156,7 @@ int main(void){
     write_to_output(mus_array);
 
 
-
+///////
 
 
 
