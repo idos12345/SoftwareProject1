@@ -1,249 +1,297 @@
 #include <stdio.h>
+#include<math.h>
 #include <string.h>
 #include <stdlib.h>
-
-
-// define vertex struct
-
-
 typedef struct node
 {
-    void* value;
+    double* xi;
     struct node* next;
     struct node* prev;
 } node;
 
-typedef struct vertex
-{
-    //double x[12]; // we have to give a size to the array ------------------------------------------------------------------
-    node* x;
-    int mu;
-} vertex;
+typedef struct mu{
+    double* mui;
+    node* xi_list;
+} mu;
 
-// create all_x_array
-// input: filename
-// output: read file and update  all_x_array -  an array of vertex , initial all mus to null
-float** initial_all_x_array(FILE* fp){
+typedef struct change{
+    node* xi_node;
+    int old_mu_index;
+    int new_mu_index;
+} change;
 
-    float** X;
+/* function decleration*/
+double** initial_all_x_array(FILE* fp, int number_of_cord, int number_of_lines);
+mu* initialze_mus_array(double** X, int K, int number_of_cord);
+int argmin(double* xi, mu* mus, int K, int number_of_cords);
+void add_x_to_mu(node* xi_node, mu* mui);
+void delete_x_from_mu(node* xi_node, mu* mui);
+void swap(node* xi_node, int old_mu, int new_mu, mu* mus);
+double euqlide_norm(double* old_mu, double* new_mu, int number_of_cords);
+double update_mus(mu* mus, int K, int number_of_cords);
+int write_to_outputfile(mu* mus, int K, char* outputfile, int number_of_cords );
+int compute_number_of_x(FILE *fp );
+int K_mean(int K, int max_iter, char* filename, char* outputfile);
 
-    char* line = calloc(100,sizeof(char));
-    char* curr;
-    float* X_i = NULL;
-    fscanf(fp,"%s",line);
-    printf("%s\n",line);
-    int count_cords = 0;
-    int count_vertexes = 0;
-    
-    //read first save reallocs in the future//
-    while(strchr((char*)line,','))
-    {
-        printf("%d\n",count_cords);
-        X_i = (float*)realloc((void*)X_i,(count_cords+1)*sizeof(float));
-        curr = strchr((char*)line, ',');
-        *curr = "\0";
-        curr++;
-        printf("in loop good\n");
-        X_i[count_cords++] = atof(line);
-        line = curr;
-        printf("%s\n",line);
-    }
-
-    printf("good1\n");
-    printf("%d\n",count_cords);
-    X_i = (float*)realloc((void*)X_i,(count_cords+1)*sizeof(float));
-    printf("good1.7\n");
-    X_i[count_cords++] =  atof(line);
-
-    printf("good2\n");
-    count_vertexes = 0;
-    X = malloc(2*sizeof(float*));
-    X[count_vertexes++] = X_i;
-    int j = 0;
-
-    printf("------------ second part ---------\n");
-    // read all other lines
-    while(fscanf(fp,"%s",line) != EOF)
-    {
-
-        X_i = calloc(count_cords,sizeof(float));
-        printf("1, %s\n",line);
-        while(strchr((char*)line,','))
+/* create an array of pointers to xi calld X
+ output: read file and update  all_x_array -  an array of vertex , initial all mus to null*/
+double** initial_all_x_array(FILE* fp, int number_of_cord, int number_of_lines){
+     double** X = (double**)calloc(number_of_lines , sizeof(double*));
+     rewind(fp);
+     int line_number;
+     double* xi;
+     char* line;
+     char* curr_place_in_line;
+        for(line_number =0 ; line_number < number_of_lines; line_number++)
         {
-            curr = strchr((char*)line, ',');
-            *curr = "\0";
-            curr++;
-            X_i[j++] = atof(line);
-            line = curr;
+            line = (char*)calloc(1024,sizeof(char));
+            fscanf(fp, "%s",line);
+            xi = (double*) calloc(number_of_cord,sizeof(double));
+            for ( int i =0; i<number_of_cord -1; i++){
+                curr_place_in_line = strchr((char*)line,','); /* point to the first , in line */
+                *curr_place_in_line = '\0'; 
+                xi[i] = atof(line); /* insert word to xi */
+                line = ++curr_place_in_line; /* update line to tne next char after , */
+            }
+            xi[number_of_cord-1] = atof(line);
+            X[line_number]= xi;  
+            
         }
-        
-        X_i[j] = atof(line);
-        printf("good till now");
-        
-        X = realloc(X,(count_vertexes+1)*sizeof(float*));
-        printf("2, %s\n",line);
-        X[count_vertexes++] = X_i;
-        j = 0;
-        
+        return X;
+}
+
+/* create mu_array from first K xi from X
+ output: return mu_array - the firt K xi from X */
+mu* initialze_mus_array(double** X, int K, int number_of_cord){
+    mu* mus = (mu*)calloc(K,sizeof(mu));
+    int i, word;
+    for(i =0; i< K; i++){
+        mus[i].mui= (double*)calloc(number_of_cord,sizeof(double));
+        mus[i].xi_list = NULL;
+        for(word =0; word < number_of_cord; word++){
+            mus[i].mui[word] = X[i][word];
+        }
     }
-    printf("done?");
-    return X;
-  
+    return mus;
 }
 
+/* outpot: the index of its clostest mu of xi*/
+int argmin(double* xi, mu* mus, int K, int number_of_cords){
+    // printf("argmin\n");
+   double min_sum, sum;
+   int min_index=0, mu_index, cord;
 
-// create mu_array
-// input: all_x_array
-// outpit: mu_array - the firt K vertex, dont forget to update thier mus
-void initialze_mus_array( struct vertex mus_array[12]){
-
+    for(mu_index =0; mu_index < K; mu_index++ ){
+       sum =0;
+       for(cord = 0; cord< number_of_cords; cord++){
+           sum += pow((xi[cord] - mus[mu_index].mui[cord]),2);
+       }
+       if (mu_index ==0) min_sum = sum;
+        else if(sum<min_sum) {
+            min_sum = sum;
+            min_index = mu_index;
+        } 
+    }
+    return min_index;
 }
 
-
-
-// argmin
-// input: vertex, mu_array
-// outpot: the index of its clostest mu
-int argmin(struct vertex xi[12], double mus_array[12] ){
-
+/* output: add node of xi to xi_list of mui*/
+void add_x_to_mu(node* xi_node, mu* mui){
+    xi_node->prev = NULL;
+    if(mui->xi_list == NULL){ /* xi_list empty*/
+        mui->xi_list = xi_node; 
+        xi_node->next = NULL;
+    }else{
+    mui->xi_list->prev = xi_node;
+    xi_node->next = mui->xi_list;
+    mui->xi_list = xi_node;
+    }
 }
 
-// update_mu_for_all_vertex
-// input: all_x_array
-// output: for evrey vertex in all_x_array update mu according to argmin
-void update_mu_for_all_vertex(struct vertex all_x_array[12]){
-
+/* output: remove node ox xi frox xi_list of mui*/
+void delete_x_from_mu(node* xi_node, mu* mui){
+    if(xi_node->prev == NULL){ /* first node in list*/
+        if(xi_node->next == NULL){ /* xi_node is the only node in list*/
+            mui->xi_list = NULL;
+        }else{
+            xi_node->next->prev = NULL;
+            mui->xi_list= xi_node->next;
+        }
+    } 
+    else if (xi_node->next ==NULL) /* last node in list*/
+    {
+        xi_node->prev->next=  NULL;
+    }
+    else{ 
+        xi_node->prev->next = xi_node->next;
+        xi_node->next->prev = xi_node->prev;
+    }
 }
 
-
-//add_vetex_to_mu
-//input: vertex, new_mu_array
-// output: add x of vertex to new_mu_array by cords
-void add_x_to_mu(struct vertex xi, double new_mus_array[12]){
-
+/* output: remote xi_node from old_mu list and add it to the start of new_mu list*/
+void swap(node* xi_node, int old_mu, int new_mu, mu* mus){
+    delete_x_from_mu(xi_node, &mus[old_mu]);
+    add_x_to_mu(xi_node,&mus[new_mu]);
 }
 
-
-// divide_all_cord_in_mus_array
-// input: new_mu_array, counter of vertex in mu
-// output: divide all cord of new_mu_array by the counter
-void divide_all_cords_in_new_mus_array(int cnt, double new_mus_array[12]){
-
-}
-
-
-// update _mus
-// input: mus_array, all_x_vertex
-// output: compute and return new_mus_array 
-void update_new_mu(double new_mus_array[12][12]){
-
-}
-
-
-// euqlide_norm
-// input: old_mu, new_mu
-// output: (old_mu**2 -new_mu**2)**0.5
-double euqlide_norm(double old_mu[12], double new_mu[12]){
-    double sum =0;
-    for(int i =0; i< (int)(sizeof(old_mu) / sizeof(old_mu[0])) ; i++){
-        double power = pow(old_mu[i] - new_mu[i],2);
+/*euqlide_norm
+output: for every cord (sum of (old_mu[cord]**2 -new_mu[cord])**2 )**0.5*/
+double euqlide_norm(double* old_mu, double* new_mu, int number_of_cords){
+    double sum =0, power;
+    int i;
+    for(i =0; i< number_of_cords ; i++){
+        power = pow(old_mu[i] - new_mu[i],2);
         sum += power;
     }
     sum = pow(sum,0.5);
     return sum;
 }
 
+/* output: compute and update new_mus_array and returns delta max */
+double update_mus(mu* mus, int K, int number_of_cords){
+    double deltamax =0, delta;
+    int mu_index, xi_list_len, cord;
+    double* new_mu;
+    double* old_mu;
+    node* curr_xi;
+    for(mu_index =0; mu_index< K; mu_index++){
+        xi_list_len =0;
+        new_mu = (double*)calloc(number_of_cords, sizeof(double));
+        curr_xi = mus[mu_index].xi_list;
+        while (curr_xi != NULL)
+        {
+            for(cord =0; cord<number_of_cords; cord++){
+                new_mu[cord] += curr_xi->xi[cord];
+            }
+            xi_list_len++;
+            curr_xi = curr_xi->next;
+        }
+        
+        for(cord =0; cord< number_of_cords; cord++){
+            new_mu[cord] = new_mu[cord]/xi_list_len;
+        }
+        old_mu =  mus[mu_index].mui;
+        delta = euqlide_norm(old_mu, new_mu, number_of_cords);
+        if (delta > deltamax) deltamax= delta;
+        mus[mu_index].mui = new_mu;
+    }
+    return deltamax;
+}
 
-// max_norm
-//input: norms_array
-// output: find thw max norm of the array
-double compute_max_norm(double norm_array[12]){
-    double max_norm =0;
-    for (int i =0; i< (int)(sizeof(norm_array) / sizeof(norm_array[0])) ; i++)
-    {
-        if(norm_array[i]>max_norm){
-            max_norm = norm_array[i];
+/* output: create output.txt and write mus_array in it*/
+int write_to_outputfile(mu* mus, int K, char* outputfile, int number_of_cords ){
+    FILE *fp;
+    fp = fopen(outputfile,"w");
+    int mu, cord;
+    if(fp == NULL){
+        printf("falid open file");
+        return 1;
+    }
+    for(mu =0; mu <K; mu++){
+        for(cord =0; cord< number_of_cords; cord++){
+             fprintf(fp,"%.4f",mus[mu].mui[cord]);
+            if (cord == number_of_cords -1 && mu != K-1 )
+            {
+                fprintf(fp,"%s","\n");
+            }else if (cord != number_of_cords-1)
+            {
+                fprintf(fp,"%s",",");
+            }     
         }
     }
-    return max_norm;
+    fclose(fp);
+    return 0; 
 }
 
-
-
-//compute_norms
-//input: mus_array, new_mus_array
-// output: create norm_array and return max norm
-/*
-double[12] compute_norm(double[12][K] mus_array, double[12][K] new_mus_array ){
-    double cord_norm [12];
-    for (int i =0; i< (int)(sizeof(mus_array) / sizeof(mus_array[0])) ; i++){
-        cord_norm[i] = euqlide_norm(mus_array[i], new_nus_array[i]);
+/*output: returns number of lines*/
+int compute_number_of_x(FILE *fp ){
+    rewind(fp); /* goes to the beginning of th file*/
+    char ch;
+    int xi_counter =0;
+     do{
+        ch = fgetc(fp);
+        if(ch =='\n') xi_counter ++;
+    } while (ch != EOF);
+    return xi_counter ;
+}
+/* output: return the number of the coordinates in every x*/
+int compute_number_of_cord(FILE *fp){
+    rewind(fp); /* goes to the beginning of th file*/
+    char ch;
+    int cords_counter =1;
+    while (ch!='\n')
+    {
+        ch = fgetc(fp);
+        if(ch == ',') cords_counter++;
     }
-    return cord_norm;
-
+  return cords_counter;
 }
-*/
-
-//write_output_file
-//input: mus_array
-//output: create output.txt and write mus_array in it
-
-
-/*
-void K_mean(int K, char* filename, int max_iter = 200){
-
-
-}
-*/
-
-
-
-int main(void){
-    int K = 12;
-    double epsilon = 0.0001;
-    int max_norm = epsilon;
-    int max_iter = 200;
-
-
+/* how to set defult max_iter = 200??*/
+int K_mean(int K, int max_iter, char* filename, char* outputfile){ 
+    double epsilon = 0.001;
+    int xi, new_mu, mu_index,change_num, old_mu;
+    int iter =0;
+    double maxdelta = epsilon;
+    int xi_counter =0;
+    node* curr_xi;
+    change* change_array;
+    node* new_xi_node;
     FILE *fp;
-    fp = fopen("input_1.txt","r");
+    fp = fopen(filename,"r");
     if (fp == NULL){
         printf("falid open file");
         return 1;
     }
-
-    /*
-    struct vertex all_x_array[12]; // we have to give an initial number of x in file, we can allocate mmemory evrey time we run of space
-    initial_all_x_array(all_x_array,*fp);
-    double mus_array[K][K];
-    initialze_mus_array(mus_array);
-    double new_mus_array[K][k];
-    */
-
-    //alternative solution with linkedlist and pointers
-
-    float** X =initial_all_x_array(fp);
-    printf("the final answer: %f",X[1][1]);
-
-/*
-    int counter =0;
-    while(max_norm>= epsilon || counter <= max_iter){
-        counter++;
-        update_mu_for_all_vertex(all_x_array);
-        new_mus_array[K][K] = { 0 };
-        update_new_mu(new_mus_array);
-        double norms_array = compute_norms(mus_array,new_mus_array);
-        max_norm = compute_max_norm(norms_array);
-        mus_array = new_mus_array;
-
+    int cords_number = compute_number_of_cord(fp);
+    int x_number = compute_number_of_x(fp);
+    double** X =initial_all_x_array(fp,cords_number,x_number);
+    mu* mus = initialze_mus_array(X,K,cords_number);
+    
+    /* initiallized xi_linled list */
+    for(xi = 0; xi< x_number; xi++){
+        new_mu = argmin(X[xi],mus,K,cords_number);
+        new_xi_node = (node*)malloc(sizeof(node));
+        new_xi_node->xi = X[xi];
+        add_x_to_mu(new_xi_node, &mus[new_mu]);
     }
-    write_to_output(mus_array);
-*/
-
-
-
-///////
-
+   /* printf("max iter = %d, maxdelts = %f, epsilon = %f, iter = %d\n", max_iter,maxdelta,epsilon,iter);*/
+    while (iter < max_iter && maxdelta >= epsilon)
+    {
+        xi_counter =0;
+        change_array =(change*) calloc(x_number,sizeof(change));
+        for(mu_index =0; mu_index< K; mu_index++){
+            curr_xi = mus[mu_index].xi_list;
+            while (curr_xi != NULL)
+            {
+                new_mu = argmin(curr_xi->xi,mus,K,cords_number);
+                change_array[xi_counter].new_mu_index = new_mu;
+                change_array[xi_counter].old_mu_index=mu_index;
+                change_array[xi_counter].xi_node = curr_xi;
+                xi_counter++;
+                curr_xi = curr_xi->next;
+            }
+        }
+        for(change_num = 0; change_num< x_number; change_num++){
+            new_mu = change_array[change_num].new_mu_index;
+            old_mu = change_array[change_num].old_mu_index;
+            if(new_mu != old_mu ){
+                swap(change_array[change_num].xi_node, old_mu,new_mu, mus);
+            }
+        }
+        maxdelta = update_mus(mus,K,cords_number);
+        iter++;
+    }
+    
+    fclose(fp);
+    write_to_outputfile(mus,K,outputfile,cords_number);
+    printf("done\n");
     return 0;
+}
 
+int main(void){ 
+    int K = 7;
+    char* fileneam = "input_2.txt";
+    char* outputname = "output_2.txt";
+    K_mean(K,200,fileneam, outputname);
+    return 1;
 }
