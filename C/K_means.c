@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include<math.h>
+#include <math.h>
 #include <string.h>
 #include <stdlib.h>
 typedef struct node
@@ -20,6 +20,9 @@ typedef struct change{
     int new_mu_index;
 } change;
 
+#define DEF_MAX_ITER 200
+#define EPSILON 0.001
+
 /* function decleration*/
 double** initial_all_x_array(FILE* fp, int number_of_cord, int number_of_lines);
 mu* initialze_mus_array(double** X, int K, int number_of_cord);
@@ -29,9 +32,13 @@ void delete_x_from_mu(node* xi_node, mu* mui);
 void swap(node* xi_node, int old_mu, int new_mu, mu* mus);
 double euqlide_norm(double* old_mu, double* new_mu, int number_of_cords);
 double update_mus(mu* mus, int K, int number_of_cords);
-int write_to_outputfile(mu* mus, int K, char* outputfile, int number_of_cords );
+int write_to_outputfile(mu* mus, int K, FILE* fp_out, int number_of_cords);
 int compute_number_of_x(FILE *fp );
-int K_mean(int K, int max_iter, char* filename, char* outputfile);
+int K_mean(int K, int max_iter, FILE* fp_in, FILE* fp_out);
+void free_memory(double** X, mu* mus, int num_of_X, int k);
+int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, int* k, int* max_iter);
+
+
 
 /* create an array of pointers to xi calld X
  output: read file and update  all_x_array -  an array of vertex , initial all mus to null*/
@@ -41,23 +48,54 @@ double** initial_all_x_array(FILE* fp, int number_of_cord, int number_of_lines){
      int line_number;
      double* xi;
      char* line;
-     char* curr_place_in_line;
+     char* curr_number_start;
+     char* curr_comma;
+
+        line = (char*)calloc(1024,sizeof(char));
         for(line_number =0 ; line_number < number_of_lines; line_number++)
         {
-            line = (char*)calloc(1024,sizeof(char));
+            curr_number_start = line;
             fscanf(fp, "%s",line);
             xi = (double*) calloc(number_of_cord,sizeof(double));
             for ( int i =0; i<number_of_cord -1; i++){
-                curr_place_in_line = strchr((char*)line,','); /* point to the first , in line */
-                *curr_place_in_line = '\0'; 
-                xi[i] = atof(line); /* insert word to xi */
-                line = ++curr_place_in_line; /* update line to tne next char after , */
+                curr_comma = strchr((char*)curr_number_start,','); /* point to the first , in line */
+                *curr_comma = '\0'; 
+                xi[i] = atof(curr_number_start); /* insert word to xi */
+                curr_number_start = ++curr_comma; /* update line to tne next char after , */
             }
-            xi[number_of_cord-1] = atof(line);
-            X[line_number]= xi;  
-            
+            xi[number_of_cord-1] = atof(curr_number_start);
+            X[line_number]= xi; 
+       
         }
+        free(line);
+        fclose(fp);
         return X;
+}
+/* free memory at the end of k_means */
+void free_memory(double** X, mu* mus, int num_of_X, int k){
+    node* curr;
+    node* step;
+
+    for (int i = 0; i < num_of_X; i++)
+    {
+        free(X[i]);
+    }
+    free(X);
+
+    for (int i = 0; i < k; i++)
+    {
+        free(mus[i].mui);
+        curr = mus[i].xi_list;
+
+        while(curr){
+            step = curr->next;
+            free(curr);
+            curr = step;
+        }
+    }
+    
+    
+
 }
 
 /* create mu_array from first K xi from X
@@ -173,33 +211,30 @@ double update_mus(mu* mus, int K, int number_of_cords){
         old_mu =  mus[mu_index].mui;
         delta = euqlide_norm(old_mu, new_mu, number_of_cords);
         if (delta > deltamax) deltamax= delta;
+        free(old_mu);
         mus[mu_index].mui = new_mu;
     }
     return deltamax;
 }
 
 /* output: create output.txt and write mus_array in it*/
-int write_to_outputfile(mu* mus, int K, char* outputfile, int number_of_cords ){
-    FILE *fp;
-    fp = fopen(outputfile,"w");
+int write_to_outputfile(mu* mus, int K, FILE* fp_out, int number_of_cords ){
+
     int mu, cord;
-    if(fp == NULL){
-        printf("falid open file");
-        return 1;
-    }
+
     for(mu =0; mu <K; mu++){
         for(cord =0; cord< number_of_cords; cord++){
-             fprintf(fp,"%.4f",mus[mu].mui[cord]);
+             fprintf(fp_out,"%.4f",mus[mu].mui[cord]);
             if (cord == number_of_cords -1 && mu != K-1 )
             {
-                fprintf(fp,"%s","\n");
+                fprintf(fp_out,"%s","\n");
             }else if (cord != number_of_cords-1)
             {
-                fprintf(fp,"%s",",");
+                fprintf(fp_out,"%s",",");
             }     
         }
     }
-    fclose(fp);
+    fclose(fp_out);
     return 0; 
 }
 
@@ -227,24 +262,18 @@ int compute_number_of_cord(FILE *fp){
   return cords_counter;
 }
 /* how to set defult max_iter = 200??*/
-int K_mean(int K, int max_iter, char* filename, char* outputfile){ 
-    double epsilon = 0.001;
+int K_mean(int K, int max_iter, FILE* fp_in, FILE* fp_out){ 
     int xi, new_mu, mu_index,change_num, old_mu;
     int iter =0;
-    double maxdelta = epsilon;
+    double maxdelta = EPSILON;
     int xi_counter =0;
     node* curr_xi;
     change* change_array;
     node* new_xi_node;
-    FILE *fp;
-    fp = fopen(filename,"r");
-    if (fp == NULL){
-        printf("falid open file");
-        return 1;
-    }
-    int cords_number = compute_number_of_cord(fp);
-    int x_number = compute_number_of_x(fp);
-    double** X =initial_all_x_array(fp,cords_number,x_number);
+
+    int cords_number = compute_number_of_cord(fp_in);
+    int x_number = compute_number_of_x(fp_in);
+    double** X =initial_all_x_array(fp_in,cords_number,x_number);
     mu* mus = initialze_mus_array(X,K,cords_number);
     
     /* initiallized xi_linled list */
@@ -255,7 +284,7 @@ int K_mean(int K, int max_iter, char* filename, char* outputfile){
         add_x_to_mu(new_xi_node, &mus[new_mu]);
     }
    /* printf("max iter = %d, maxdelts = %f, epsilon = %f, iter = %d\n", max_iter,maxdelta,epsilon,iter);*/
-    while (iter < max_iter && maxdelta >= epsilon)
+    while (iter < max_iter && maxdelta >= EPSILON)
     {
         xi_counter =0;
         change_array =(change*) calloc(x_number,sizeof(change));
@@ -281,17 +310,64 @@ int K_mean(int K, int max_iter, char* filename, char* outputfile){
         maxdelta = update_mus(mus,K,cords_number);
         iter++;
     }
-    
-    fclose(fp);
-    write_to_outputfile(mus,K,outputfile,cords_number);
+
+    write_to_outputfile(mus,K,fp_out,cords_number);
+    free_memory(X,mus,x_number,K);
     printf("done\n");
     return 0;
 }
 
-int main(void){ 
-    int K = 7;
-    char* fileneam = "input_2.txt";
-    char* outputname = "output_2.txt";
-    K_mean(K,200,fileneam, outputname);
+/* submit args to vars, return 1 if successed else 0 */
+int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, int* k, int* max_iter){
+    char* input_file;
+    char* output_file;
+    if (argc != 4 && argc != 5)
+    {
+        return 0;
+    }
+
+    *k = atoi(argv[1]);
+
+    /* if max_iter is not given */
+    if (argc == 4)
+    {
+        *max_iter = DEF_MAX_ITER;
+        input_file = argv[2];
+        output_file = argv[3];
+    }
+
+    /* if max_iter is given */
+    if (argc == 5)
+    {
+        *max_iter = atoi(argv[2]);
+        input_file = argv[3];
+        output_file = argv[4];
+    }
+
+    *fp_in  = fopen(input_file,"r");
+    *fp_out = fopen(output_file,"w");
+
+    /* input check */
+    if (*k <= 0 || *max_iter <= 0  || *fp_in == NULL || fp_out == NULL)
+    {
+        printf("Invalid Input!");
+        return 0;
+    }
+
+    return 1;
+    
+    
+
+}
+
+int main(int argc, char **argv){ 
+    int K;
+    int max_iter;
+
+    FILE* fp_in;
+    FILE* fp_out;
+    
+    if(submit_args(argc,argv,&fp_in,&fp_out,&K,&max_iter) == 0) return 0;
+    K_mean(K,max_iter,fp_in, fp_out);
     return 1;
 }
