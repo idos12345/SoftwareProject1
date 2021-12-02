@@ -2,6 +2,7 @@
 #include<math.h>
 #include <string.h>
 #include <stdlib.h>
+// desktop
 typedef struct node
 {
     double* xi;
