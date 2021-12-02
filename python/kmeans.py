@@ -1,4 +1,8 @@
 import math
+import sys
+
+epsilon = 0.001
+
 
 # input: 2 vertex
 # output: compute euclidean norm of them
@@ -36,8 +40,8 @@ def argmin(xi, mu_list):
     return idx
 
 
-def k_means(K, filename, max_iter=200):
-    file = open(filename)
+def k_means(K, input_filename, output_filename, max_iter=200):
+    file = open(input_filename)
     mu_list = [[] for i in range(K)]
     d = {}
 
@@ -83,7 +87,7 @@ def k_means(K, filename, max_iter=200):
 
         delta_max = max(cord_delta_list)  # fins the max delta
 
-    outputfile = open("output.txt", "w")  # create output file and write all mus into it
+    outputfile = open(output_filename, "w")  # create output file and write all mus into it
     for mu in mu_list:
         mu = [(str('{:.4f}'.format(cord))) for cord in mu]
         str1 = ','.join(mu)
@@ -92,6 +96,46 @@ def k_means(K, filename, max_iter=200):
     return outputfile
 
 
-epsilon = 0.001
-file_name = "input_1.txt"
-k_means(15, file_name, 300)
+def submit_args():
+    if len(sys.argv) != 4 and len(sys.argv) != 5:
+        print("Invalid Input!")
+        return 0
+    try:
+        k = int(sys.argv[1])
+        if len(sys.argv) == 5:
+
+            max_iter = int(sys.argv[2])
+            input_file_name = sys.argv[3]
+            output_file_name = sys.argv[4]
+        else:
+            max_iter = 200
+            input_file_name = sys.argv[2]
+            output_file_name = sys.argv[3]
+
+        if max_iter <= 0 or k <= 0:
+            return 0
+
+        f_input = open(input_file_name)
+        f_output = open(output_file_name,'w')
+        f_input.close()
+        f_output.close()
+
+    except OSError:
+        print("Invalid Input!")
+        return 0
+
+    return k, max_iter, input_file_name, output_file_name
+
+
+def main():
+    args = submit_args()
+    if args == 0:
+        return 0
+    k, max_iter, input_file_name, output_file_name = args
+    k_means(k, input_file_name,output_file_name, max_iter)
+
+    return 1
+
+
+if __name__ == '__main__':
+    main()

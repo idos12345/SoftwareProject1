@@ -333,12 +333,8 @@ int K_mean(int K, int max_iter, FILE* fp_in, FILE* fp_out){
 int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, int* k, int* max_iter){
     char* input_file;
     char* output_file;
-    if (argc != 4 && argc != 5)  return 0;
-   
-    /* input check */
-    if (*k <= 0 || *max_iter <= 0  || *fp_in == NULL || fp_out == NULL)
-    {
-        printf("Invalid Input!");
+    if (argc != 4 && argc != 5){
+        printf("Invalid Input!\n");
         return 0;
     }
 
@@ -362,6 +358,14 @@ int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, int* k, int*
      
     *fp_in  = fopen(input_file,"r");
     *fp_out = fopen(output_file,"w");
+
+        /* input check */
+    if (*k <= 0 || *max_iter <= 0  || *fp_in == NULL || fp_out == NULL)
+    {
+        printf("Invalid Input!\n");
+        return 0;
+    }
+
     return 1;
 }
 
