@@ -34,12 +34,12 @@ double euqlide_norm(double* old_mu, double* new_mu, int number_of_cords);
 double update_mus(mu* mus, int K, int number_of_cords);
 int write_to_outputfile(mu* mus, int K, FILE* fp_out, int number_of_cords);
 int compute_number_of_x(FILE *fp );
-void initial_xi_liked_list( int number_of_lines, int K, int number_of_cords, mu* mus, double** X);
+int initial_xi_liked_list( int number_of_lines, int K, int number_of_cords, mu* mus, double** X);
 change* update_changes_array(mu* mus, change* change_array, int number_of_cords, int K );
 void implementing_changes(mu* mus, int number_of_lines, change* change_array);
 int K_mean(int K, int max_iter, FILE* fp_in, FILE* fp_out);
 void free_memory(double** X, mu* mus, int num_of_X, int k);
-int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, int* k, int* max_iter);
+int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, double* k, double* max_iter);
 
 
 
@@ -55,11 +55,22 @@ double** initial_all_x_array(FILE* fp, int number_of_cord, int number_of_lines){
      rewind(fp);
 
         line = (char*)calloc(1024,sizeof(char));
+        if (line == NULL)
+        {
+            printf("An Error Has Occurred\n");
+            return NULL;
+        }
+        
         for(line_number =0 ; line_number < number_of_lines; line_number++)
         {
             curr_number_start = line;
             fscanf(fp, "%s",line);
             xi = (double*) calloc(number_of_cord,sizeof(double));
+            if (xi == NULL)
+            {
+                printf("An Error Has Occurred\n");
+                return NULL;
+            }
             for ( i =0; i<number_of_cord -1; i++){
                 curr_comma = strchr((char*)curr_number_start,','); /* point to the first , in line */
                 *curr_comma = '\0'; 
@@ -84,12 +95,10 @@ void free_memory(double** X, mu* mus, int num_of_X, int k){
         free(X[i]);
     }
     free(X);
-
     for (i = 0; i < k; i++)
     {
         free(mus[i].mui);
         curr = mus[i].xi_list;
-
         while(curr){
             step = curr->next;
             free(curr);
@@ -105,6 +114,10 @@ mu* initialze_mus_array(double** X, int K, int number_of_cord){
     int i, word;
     for(i =0; i< K; i++){
         mus[i].mui= (double*)calloc(number_of_cord,sizeof(double));
+        if(mus[i].mui == NULL){
+            printf("An Error Has Occurred\n");
+            return NULL;
+        }
         mus[i].xi_list = NULL;
         for(word =0; word < number_of_cord; word++){
             mus[i].mui[word] = X[i][word];
@@ -191,9 +204,14 @@ double update_mus(mu* mus, int K, int number_of_cords){
     double* new_mu;
     double* old_mu;
     node* curr_xi;
+    
     for(mu_index =0; mu_index< K; mu_index++){
         xi_list_len =0;
         new_mu = (double*)calloc(number_of_cords, sizeof(double));
+        if(new_mu == NULL){
+            printf("An Error Has Occurred\n");
+            return -1;
+        }
         curr_xi = mus[mu_index].xi_list;
         while (curr_xi != NULL)
         {
@@ -203,7 +221,7 @@ double update_mus(mu* mus, int K, int number_of_cords){
             xi_list_len++;
             curr_xi = curr_xi->next;
         }
-        
+        /* we assume xi_list_len != 0 becuse mui dosent have an empty list as noted in the forum */
         for(cord =0; cord< number_of_cords; cord++){
             new_mu[cord] = new_mu[cord]/xi_list_len;
         }
@@ -218,9 +236,7 @@ double update_mus(mu* mus, int K, int number_of_cords){
 
 /* output: create output.txt and write mus_array in it*/
 int write_to_outputfile(mu* mus, int K, FILE* fp_out, int number_of_cords ){
-
     int mu, cord;
-
     for(mu =0; mu <K; mu++){
         for(cord =0; cord< number_of_cords; cord++){
              fprintf(fp_out,"%.4f",mus[mu].mui[cord]);
@@ -252,8 +268,8 @@ int compute_number_of_x(FILE *fp ){
 /* output: return the number of the coordinates in every x*/
 int compute_number_of_cord(FILE *fp){
     char ch;
-    int cords_counter =1;
-     rewind(fp); /* goes to the beginning of th file*/
+    int cords_counter = 1;
+    rewind(fp); /* goes to the beginning of th file*/
     while (ch!='\n')
     {
         ch = fgetc(fp);
@@ -262,15 +278,20 @@ int compute_number_of_cord(FILE *fp){
   return cords_counter;
 }
 /*create node for each xi and insert it to it's closest mu linked list */
-void initial_xi_liked_list( int number_of_lines, int K, int number_of_cords, mu* mus, double** X){
+int initial_xi_liked_list( int number_of_lines, int K, int number_of_cords, mu* mus, double** X){
     int xi, new_mu;
     node* new_xi_node;
     for(xi = 0; xi< number_of_lines; xi++){
         new_mu = argmin(X[xi],mus,K,number_of_cords);
         new_xi_node = (node*)malloc(sizeof(node));
+        if(new_xi_node == NULL ) {
+            printf("An Error Has Occurred\n");
+            return 0;
+        }
         new_xi_node->xi = X[xi];
         add_x_to_mu(new_xi_node, &mus[new_mu]);
     }
+    return 1;
 }
 
 /* for evry xi save its old mu & new mu in changes array */ 
@@ -307,39 +328,61 @@ void implementing_changes(mu* mus, int number_of_lines, change* change_array){
 /* how to set defult max_iter = 200??*/
 int K_mean(int K, int max_iter, FILE* fp_in, FILE* fp_out){ 
     double maxdelta = EPSILON;
-    int  iter =0, number_of_cords, number_of_lines;
+    int  iter =0, number_of_cords, number_of_lines, memory_alocate;
     change* change_array;
     double** X; 
     mu* mus;
     number_of_cords = compute_number_of_cord(fp_in);
     number_of_lines = compute_number_of_x(fp_in);
+
     X =initial_all_x_array(fp_in,number_of_cords,number_of_lines);
+    if(X == NULL){
+        printf("An Error Has Occurred\n");
+        return 1;
+    }
     mus = initialze_mus_array(X,K,number_of_cords);
-    initial_xi_liked_list(number_of_lines, K, number_of_cords, mus,X);
+    if(mus == NULL){
+        printf("An Error Has Occurred\n");
+        return 1;
+    }
+    memory_alocate= initial_xi_liked_list(number_of_lines, K, number_of_cords, mus,X);
+    if(memory_alocate == 0) {
+        printf("An Error Has Occurred\n");
+        return 1;
+    }
     while (iter < max_iter && maxdelta >= EPSILON)
     {
         change_array =(change*) calloc(number_of_lines,sizeof(change));
+        if(change_array == NULL ) {
+            printf("An Error Has Occurred\n");
+            return 1;
+        }
         change_array = update_changes_array(mus,change_array,number_of_cords,K); /* update changes_array according new mus */
         implementing_changes(mus, number_of_lines,change_array); /* link evrey xi to its new mu according to changes_array */ 
         maxdelta = update_mus(mus,K,number_of_cords); /* compute new max delts */ 
+        if(maxdelta == -1) {
+            printf("An Error Has Occurred\n");
+            return 1;
+        }
         iter++;
     }
     write_to_outputfile(mus,K,fp_out,number_of_cords);
     free_memory(X,mus,number_of_lines,K);
-    printf("done\n");
     return 0;
 }
 
 /* submit args to vars, return 1 if successed else 0 */
-int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, int* k, int* max_iter){
+int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, double* k, double* max_iter){
     char* input_file;
     char* output_file;
+    char* eptr;
     if (argc != 4 && argc != 5)
     {
+        printf("Invalid Input!");
         return 0;
     }
 
-    *k = atoi(argv[1]);
+    *k = strtod(argv[1], &eptr);
 
     /* if max_iter is not given */
     if (argc == 4)
@@ -352,16 +395,22 @@ int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, int* k, int*
     /* if max_iter is given */
     if (argc == 5)
     {
-        *max_iter = atoi(argv[2]);
+        *max_iter = strtod(argv[2], &eptr);
         input_file = argv[3];
         output_file = argv[4];
     }
 
     *fp_in  = fopen(input_file,"r");
     *fp_out = fopen(output_file,"w");
+    /* one of the file didnt opened */
+    if(fp_in == NULL || fp_out == NULL){
+        printf("An Error Has Occurred\n");
+        return 0;
+    }
+
 
     /* input check */
-    if (*k <= 0 || *max_iter <= 0  || *fp_in == NULL || fp_out == NULL)
+    if (*k <= 0|| *k != (int)*k || *max_iter <= 0|| *max_iter != (int)*max_iter || *fp_in == NULL || fp_out == NULL)
     {
         printf("Invalid Input!");
         return 0;
@@ -370,11 +419,13 @@ int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, int* k, int*
 }
 
 int main(int argc, char **argv){ 
-    int K;
-    int max_iter;
+    double K_double, max_iter_double ;
+    int K, max_iter;
     FILE* fp_in;
     FILE* fp_out;
-    if(submit_args(argc,argv,&fp_in,&fp_out,&K,&max_iter) == 0) return 0;
+    if(submit_args(argc,argv,&fp_in,&fp_out,&K_double,&max_iter_double) == 0) return 0;
+    K = (int) K_double;
+    max_iter = (int)max_iter_double;
     K_mean(K,max_iter,fp_in, fp_out);
     return 1;
 }
