@@ -47,7 +47,11 @@ def k_means(K, input_filename, output_filename, max_iter=200):
 
     for i in range(K):
         mu_list[i] = file.readline().split(",")
+        if mu_list[i][0] == '':
+            print("Invalid Input!")
+            return 0
         mu_list[i] = [(float(mu)) for mu in mu_list[i]]
+
         d[i] = []
 
     file.seek(0, 0)  # return to the beginning of the file
@@ -93,7 +97,7 @@ def k_means(K, input_filename, output_filename, max_iter=200):
         str1 = ','.join(mu)
         outputfile.write(str1 + '\n')
 
-    return outputfile
+    return 1
 
 
 def submit_args():
@@ -112,11 +116,11 @@ def submit_args():
             input_file_name = sys.argv[2]
             output_file_name = sys.argv[3]
 
-        if max_iter <= 0 or k <= 0:
+        if type(k) != int or type(max_iter) != int or max_iter <= 0 or k <= 0:
             return 0
 
         f_input = open(input_file_name)
-        f_output = open(output_file_name,'w')
+        f_output = open(output_file_name, 'w')
         f_input.close()
         f_output.close()
 
@@ -132,9 +136,7 @@ def main():
     if args == 0:
         return 0
     k, max_iter, input_file_name, output_file_name = args
-    k_means(k, input_file_name,output_file_name, max_iter)
-
-    return 1
+    return k_means(k, input_file_name, output_file_name, max_iter)
 
 
 if __name__ == '__main__':
