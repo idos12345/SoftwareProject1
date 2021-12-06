@@ -335,6 +335,11 @@ int K_mean(int K, int max_iter, FILE* fp_in, FILE* fp_out){
     number_of_cords = compute_number_of_cord(fp_in);
     number_of_lines = compute_number_of_x(fp_in);
 
+    if(K > number_of_lines){
+        printf("Invalid Input!\n");
+        return 1;
+    }
+
     X =initial_all_x_array(fp_in,number_of_cords,number_of_lines);
     if(X == NULL){
         printf("An Error Has Occurred\n");
@@ -379,7 +384,7 @@ int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, double* k, d
     if (argc != 4 && argc != 5)
     {
         printf("Invalid Input!\n");
-        return 0;
+        return 1;
     }
 
     *k = strtod(argv[1], &eptr);
@@ -405,7 +410,7 @@ int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, double* k, d
     /* one of the file didnt opened */
     if(fp_in == NULL || fp_out == NULL){
         printf("An Error Has Occurred\n");
-        return 0;
+        return 1;
     }
 
 
@@ -413,7 +418,7 @@ int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, double* k, d
     if (*k <= 0|| *k != (int)*k || *max_iter <= 0|| *max_iter != (int)*max_iter || *fp_in == NULL || fp_out == NULL)
     {
         printf("Invalid Input!\n");
-        return 0;
+        return 1;
     }
     return 1;
 }
@@ -423,9 +428,9 @@ int main(int argc, char **argv){
     int K, max_iter;
     FILE* fp_in;
     FILE* fp_out;
-    if(submit_args(argc,argv,&fp_in,&fp_out,&K_double,&max_iter_double) == 0) return 0;
+    if(submit_args(argc,argv,&fp_in,&fp_out,&K_double,&max_iter_double) == 0) return 1;
     K = (int) K_double;
     max_iter = (int)max_iter_double;
     K_mean(K,max_iter,fp_in, fp_out);
-    return 1;
+    return 0;
 }

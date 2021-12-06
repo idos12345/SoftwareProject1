@@ -124,7 +124,7 @@ def submit_args():
         f_input.close()
         f_output.close()
 
-    except OSError:
+    except (ValueError,OSError):
         print("Invalid Input!")
         return 0
 
