@@ -378,7 +378,7 @@ int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, double* k, d
     char* eptr;
     if (argc != 4 && argc != 5)
     {
-        printf("Invalid Input!");
+        printf("Invalid Input!\n");
         return 0;
     }
 
@@ -412,7 +412,7 @@ int submit_args(int argc, char **argv, FILE** fp_in, FILE** fp_out, double* k, d
     /* input check */
     if (*k <= 0|| *k != (int)*k || *max_iter <= 0|| *max_iter != (int)*max_iter || *fp_in == NULL || fp_out == NULL)
     {
-        printf("Invalid Input!");
+        printf("Invalid Input!\n");
         return 0;
     }
     return 1;
