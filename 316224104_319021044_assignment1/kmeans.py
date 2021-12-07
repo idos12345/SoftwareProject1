@@ -83,8 +83,6 @@ def k_means(K, input_filename, output_filename, max_iter=200):
         cord_delta_list = []
         for mu_index in range(len(mu_list)):
             new_mu = update_mu(d[mu_index])
-            for i in range(len(new_mu)):
-                new_mu[i] = float('{:.4f}'.format(new_mu[i]))  # keeping only 4 numbers after point
             old_mu = mu_list[mu_index]
             cord_delta_list.append(euclidean_norm(new_mu, old_mu))  # compute and save delta between new and ols mu
             mu_list[mu_index] = new_mu  # update mus list
