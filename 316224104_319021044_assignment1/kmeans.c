@@ -104,7 +104,9 @@ void free_memory(double** X, mu* mus, int num_of_X, int k){
             free(curr);
             curr = step;
         }
+
     }
+    free((void*)mus);
 }
 
 /* create mu_array from first K xi from X
@@ -267,7 +269,7 @@ int compute_number_of_x(FILE *fp ){
 }
 /* output: return the number of the coordinates in every x*/
 int compute_number_of_cord(FILE *fp){
-    char ch;
+    char ch = '0';
     int cords_counter = 1;
     rewind(fp); /* goes to the beginning of th file*/
     while (ch!='\n')
@@ -370,6 +372,11 @@ int K_mean(int K, int max_iter, FILE* fp_in, FILE* fp_out){
             return 1;
         }
         iter++;
+        
+        /*free change array*/
+        free(change_array);
+        
+        
     }
     write_to_outputfile(mus,K,fp_out,number_of_cords);
     free_memory(X,mus,number_of_lines,K);
